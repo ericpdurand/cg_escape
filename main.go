@@ -2,6 +2,7 @@ package main
 
 import "fmt"
 import "os"
+import "math"
 
 /**
  * Auto-generated code below aims at helping you parse
@@ -19,7 +20,12 @@ var (
 )
 
 type Player struct {
-	x, y, wallsLeft int
+	x, y, wallsLeft, id int
+}
+
+type Wall struct {
+    x,y int
+    wType string
 }
 
 func main() {
@@ -30,12 +36,12 @@ func main() {
 	myId = 2
 	fmt.Fprintln(os.Stderr, "Init: ", w, h, playerCount, myId)
 
-	others = make([]Player, playerCount-1)
 	board = make([][]int, h)
 	vWalls = make([][]int, h)
 	hWalls = make([][]int, h+1)
 
 	for {
+		others = make([]Player, 0)
 		for i := range board {
 			board[i] = make([]int, w)
 			for j := range board[i] {
@@ -63,26 +69,26 @@ func main() {
 		}
 
 		var x, y, wallsLeft int
-		x = 0
-		y = 3
-		wallsLeft = 6
-		newOne := Player{x, y, wallsLeft}
+		x = 7
+		y = 4
+		wallsLeft = 5
+		newOne := Player{x, y, wallsLeft, 1}
 		others = append(others, newOne)
 		fmt.Fprintf(os.Stderr, "Other: %v\n", newOne)
 		board[y][x] = 0
 
-		x = 8
-		y = 5
+		x = 6
+		y = 2
 		wallsLeft = 6
-		newOne = Player{x, y, wallsLeft}
+		newOne = Player{x, y, wallsLeft,2}
 		others = append(others, newOne)
 		fmt.Fprintf(os.Stderr, "Other: %v\n", newOne)
 		board[y][x] = 1
 
-		x = 6
-		y = 0
-		wallsLeft = 6
-		me = Player{x, y, wallsLeft}
+		x = 1
+		y = 7
+		wallsLeft = 3
+		me = Player{x, y, wallsLeft,0}
 		fmt.Fprintf(os.Stderr, "Me: %v\n", me)
 		board[y][x] = 2
 
@@ -91,62 +97,61 @@ func main() {
 		// wallCount: number of walls on the board
 		wallCount = 3
 
-		var wallX, wallY int
-		var wallOrientation string
-		wallX = 2
-		wallY = 6
-		wallOrientation = "V"
-		handleWall(wallX, wallY, wallOrientation)
-		wallX = 3
-		wallY = 4
-		wallOrientation = "V"
-		handleWall(wallX, wallY, wallOrientation)
-		wallX = 6
-		wallY = 2
-		wallOrientation = "H"
-		handleWall(wallX, wallY, wallOrientation)
+
+		walls := []Wall{
+                Wall{2, 7, "V"},
+                Wall{7, 2, "H"},
+                Wall{7, 4, "V"},
+                Wall{7, 2, "V"},
+        	}
+        
+		for _,w := range walls {
+            		if w.wType=="V" {
+                		vWalls[w.y][w.x] = 1
+                		vWalls[w.y+1][w.x] = 1
+            		} else {
+                		hWalls[w.y][w.x] = 1
+                		hWalls[w.y][w.x+1] = 1
+            		}
+        	}
 
 		fmt.Fprintf(os.Stderr, "vWalls: \n")
-		simplePrint(vWalls)
-		fmt.Fprintf(os.Stderr, "hWalls: \n")
-		simplePrint(hWalls)
+        	simplePrint(vWalls)
+        	fmt.Fprintf(os.Stderr, "hWalls: \n")
+        	simplePrint(hWalls)
 
-		wx := 2
-		wy := 6
-		tx, ty, err := getSafeWall(wx, wy, "V")
-		fmt.Fprintf(os.Stderr, "Test wall %v %v %v %v %v\n", wx, wy, tx, ty, err)
-
-		wx = 2
-		wy = 5
-		tx, ty, err = getSafeWall(wx, wy, "V")
-		fmt.Fprintf(os.Stderr, "Test wall %v %v %v %v %v\n", wx, wy, tx, ty, err)
-
-		wx = 3
-		wy = 8
-		tx, ty, err = getSafeWall(wx, wy, "V")
-		fmt.Fprintf(os.Stderr, "Test wall %v %v %v %v %v\n", wx, wy, tx, ty, err)
-
-		fmt.Fprintf(os.Stderr, "First: \n")
-		scoreMap := buildMap(0)
+		fmt.Fprintf(os.Stderr, "Me: \n")
+		scoreMap := buildMap(me.id)
 		print(scoreMap)
 
-		result := strategy(scoreMap)
-
+		result,score := strategy(scoreMap, me.x,me.y)
+	
+		fmt.Fprintf(os.Stderr, "myResult: %v %v\n", result, score)
+	
 		fmt.Println(result)
-		fmt.Fprintf(os.Stderr, "Second: \n")
-		scoreMap = buildMap(1)
-		print(scoreMap)
 
-		result = strategy(scoreMap)
+		
+		fmt.Fprintf(os.Stderr, "Other1: \n")
+                scoreMap = buildMap(others[0].id)
+                print(scoreMap)
 
-		fmt.Println(result)
-		fmt.Fprintf(os.Stderr, "Last: \n")
-		scoreMap = buildMap(2)
-		print(scoreMap)
+                result, score = strategy(scoreMap,others[0].x,others[0].y)
+		
+		fmt.Fprintf(os.Stderr, "0Result: %v %v\n", result, score)
 
-		result = strategy(scoreMap)
+                fmt.Println(result)
 
-		fmt.Println(result)
+		fmt.Fprintf(os.Stderr, "Me: \n")
+                scoreMap = buildMap(others[1].id)
+                print(scoreMap)
+
+                result, score = strategy(scoreMap,others[1].x,others[1].y)
+		fmt.Fprintf(os.Stderr, "1Result: %v %v\n", result, score)
+
+                fmt.Println(result)
+		
+		result = messWith(1)
+		fmt.Println("Messup result: %v",result)
 
 		break
 	}
@@ -162,26 +167,113 @@ func handleWall(wallX, wallY int, wallOrientation string) {
 	}
 }
 
-func strategy(scoreMap [][]int) (result string) {
-	result = "RIGHT"
-	min := scoreMap[me.y][me.x]
-	if me.x > 0 && scoreMap[me.y][me.x-1] < min && vWalls[me.y][me.x] == 0 {
-		result = "LEFT"
-		min = scoreMap[me.y][me.x-1]
+func messWith(id int)(result string){
+    player := others[id]
+    fmt.Fprintf(os.Stderr, "Player  : %v\n",player)
+    switch player.id {
+        case 0 :{
+            tx,ty,err := getSafeWall(player.x+1,player.y,"V")
+            if err == nil {
+                err = checkCrossing(tx,ty,"V")
+		if err == nil {
+			result =  fmt.Sprintf("%v %v V",tx,ty)
+		}
+            } else {
+                fmt.Fprintf(os.Stderr, "Wall error  : %v\n",err)
+                result = ""
+            }
+        }
+        case 1 :{
+            tx,ty,err := getSafeWall(player.x,player.y,"V")
+            if err == nil {
+		err = checkCrossing(tx,ty,"V")
+		if err == nil {
+                	result =  fmt.Sprintf("%v %v V",tx,ty)
+		}
+            } else {
+                fmt.Fprintf(os.Stderr, "Wall error  : %v\n",err)
+                result = ""
+            }
+        }
+        case 2 :{
+            tx,ty,err := getSafeWall(player.x,player.y+1,"H")
+            if err == nil {
+		err = checkCrossing(tx,ty,"H")
+		if err == nil {
+	 		result =  fmt.Sprintf("%v %v H",tx,ty)
+		}
+            } else {
+                fmt.Fprintf(os.Stderr, "Wall error  : %v\n",err)
+                result = ""
+            }
+        }
+        default :{
+            fmt.Fprintf(os.Stderr, "Woot?  : %v\n",id)
+        }
+    }
+    return result
+}
+
+func checkCrossing(x,y int , wType string) error {
+	if wType == "V" {
+		if hWalls[y+1][x-1] !=0 && hWalls[y+1][x] != 0 {
+			count := 1
+			for i:=x+1;i<w;i++ {
+				if hWalls[y+1][i] !=0 {
+					count++
+				} else {
+					break
+				}
+			}
+			if math.Trunc(float64(count)/2) == math.Trunc(float64(count+1)/2) {
+				return nil
+			} else {
+				return fmt.Errorf("Forbidden wall in %v %v.",x,y)
+			}			
+		} else {
+			return nil
+		}
+	} else {
+		if vWalls[y-1][x+1] !=0 && vWalls[y][x+1] != 0 {
+                        count := 1
+                        for i:=y+1;i<h;i++ {
+                                if vWalls[i][x+1] !=0 {
+                                        count++
+                                } else {
+                                        break
+                                }
+                        }
+                        if math.Trunc(float64(count)/2) == math.Trunc(float64(count+1)/2) {
+                                return nil
+                        } else {
+                                return fmt.Errorf("Forbidden wall in %v %v.",x,y)
+                        }
+                } else {
+                        return nil
+                }
 	}
-	if me.x < w-1 && scoreMap[me.y][me.x+1] < min && vWalls[me.y][me.x+1] == 0 {
-		result = "RIGHT"
-		min = scoreMap[me.y][me.x+1]
-	}
-	if me.y > 0 && scoreMap[me.y-1][me.x] < min && hWalls[me.y][me.x] == 0 {
-		result = "UP"
-		min = scoreMap[me.y-1][me.x]
-	}
-	if me.y < h-1 && scoreMap[me.y+1][me.x] < min && hWalls[me.y+1][me.x] == 0 {
-		result = "DOWN"
-		min = scoreMap[me.y+1][me.x]
-	}
-	return result
+}
+
+func strategy(scoreMap [][]int, px, py int) (result string, score int) {
+    result = "RIGHT"
+    min := scoreMap[py][px]
+    if px > 0 && scoreMap[py][px-1] < min && vWalls[py][px] == 0 {
+        result = "LEFT"
+        min = scoreMap[py][px-1]
+    }
+    if px < w-1 && scoreMap[py][px+1] < min && vWalls[py][px+1] == 0 {
+        result = "RIGHT"
+        min = scoreMap[py][px+1]
+    }
+    if py > 0 && scoreMap[py-1][px] < min && hWalls[py][px] == 0 {
+        result = "UP"
+        min = scoreMap[py-1][px]
+    }
+    if py < h-1 && scoreMap[py+1][px] < min && hWalls[py+1][px] == 0 {
+        result = "DOWN"
+        min = scoreMap[py+1][px]
+    }
+    return result, min
 }
 
 func simplePrint(data [][]int) {
@@ -286,17 +378,29 @@ func buildMap(target int) (result [][]int) {
 		for i := 0; i < h; i++ {
 			result[i][w-1] = 0
 		}
-		computePoint(&result, w-2, 0)
+		for i := 0; i < h; i++ {
+			if vWalls[i][w-1] == 0 {
+				computePoint(&result, w-2, i)
+			}
+		}
 	case 1:
 		for i := 0; i < h; i++ {
 			result[i][0] = 0
 		}
-		computePoint(&result, 1, 0)
+		for i := 0; i < h; i++ {
+                        if vWalls[i][1] == 0 {
+                                computePoint(&result, 1, i)
+                        }
+                }
 	case 2:
 		for i := 0; i < w; i++ {
 			result[h-1][i] = 0
 		}
-		computePoint(&result, 0, h-2)
+		for i := 0; i < w; i++ {
+                        if hWalls[h-1][i] == 0 {
+                                computePoint(&result, i, h-2)
+                        }
+                }
 	}
 	return result
 }
@@ -316,7 +420,9 @@ func computePoint(data *[][]int, x, y int) {
 	if y < h-1 && (*data)[y+1][x] < min && hWalls[y+1][x] == 0 {
 		min = (*data)[y+1][x]
 	}
-	(*data)[y][x] = min + 1
+	if min<100 {
+		(*data)[y][x] = min + 1
+	}
 
 	if x > 0 && vWalls[y][x] == 0 && (*data)[y][x-1] > (*data)[y][x]+1 {
 		//fmt.Fprintf(os.Stderr, " call computePoint: %v %v %v, %v %v %v \n", x, y, (*data)[y][x], x-1, y, (*data)[y][x-1])
